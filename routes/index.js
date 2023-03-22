@@ -6,6 +6,7 @@ const { errorHandler } = require('../middleware/error-handler')
 const userController = require('../controllers/user-controller')
 const tweetController = require('../controllers/tweet-controller')
 
+router.get('/users/:id/tweets', authenticated, userController.getUserTweets)
 router.put('/users/:id/account', authenticated, userController.editUserAccount)
 router.put('/users/:id', authenticated, uploadMultiple, userController.editUserProfile)
 router.get('/users/:id', authenticated, userController.getUser)
