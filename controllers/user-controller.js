@@ -59,11 +59,13 @@ const userController = {
         ]
       })
       if (!data) throw new Error('查無此使用者')
+      const signinUser = helpers.getUser(req)
       const user = {
         ...data.toJSON(),
         followers: data.Followers?.length,
         followings: data.Followings?.length,
-        isMyself: helpers.getUser(req).id === Number(id)
+        isMyself: helpers.getUser(req).id === Number(id),
+        isFollowing: (signinUser.Followings) ? signinUser.Followings.some(following => following.id === Number(id)) : false
       }
       delete user.Followers
       delete user.Followings
