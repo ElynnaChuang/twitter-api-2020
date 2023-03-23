@@ -23,6 +23,31 @@ const replyController = {
     } catch (err) {
       next(err)
     }
+  },
+  getReplies: async (req, res, next) => {
+    try {
+      const TweetId = req.params.tweet_id
+      const tweet = await Tweet.findByPk(TweetId, { raw: true })
+      if (!tweet) throw new Error('推文不存在')
+      const accountReplied = await User.findByPk(tweet.UserId, {
+        attributes: ['account'],
+        raw: true
+      })
+      const data = await Reply.findAll({
+        include: [
+          { model: User, attributes: ['id', 'name', 'account', 'avatar'] }
+        ],
+        where: { TweetId },
+        order: [['updatedAt', 'DESC']]
+      })
+      const replies = data?.map(d => ({
+        ...d.toJSON(),
+        accountReplied: accountReplied?.account
+      }))
+      res.status(200).json(replies)
+    } catch (err) {
+      next(err)
+    }
   }
 }
 
