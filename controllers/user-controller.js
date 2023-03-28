@@ -32,13 +32,14 @@ const userController = {
       if (name.length > 50) throw new Error('名稱不可超過50字')
       if (password !== checkPassword) throw new Error('密碼與確認密碼不符')
       const [isAccountExist, isEmailExist] = await Promise.all([
-        User.findOne({ where: { role: 'user', account }, attributes: ['id'] }),
-        User.findOne({ where: { role: 'user', email }, attributes: ['id'] })
+        User.findOne({ where: { role: 'user', account }, attributes: ['id'], raw: true }),
+        User.findOne({ where: { role: 'user', email }, attributes: ['id'], raw: true })
       ])
       if (isAccountExist) throw new Error('account 已重複註冊！')
       if (isEmailExist) throw new Error('email 已重複註冊！')
       const user = await User.create({
         role: 'user',
+        avatar: 'https://i.imgur.com/zPtV6xw.png',
         account,
         name,
         email,
@@ -65,10 +66,10 @@ const userController = {
       const user = {
         ...data.toJSON(),
         tweets: data.Tweets.length,
-        followers: data.Followers?.length,
-        followings: data.Followings?.length,
-        isMyself: helpers.getUser(req).id === Number(id),
-        isFollowing: (signinUser.Followings) ? signinUser.Followings.some(following => following.id === Number(id)) : false
+        followers: data.Followers.length,
+        followings: data.Followings.length,
+        isMyself: signinUser.id === Number(id),
+        isFollowing: signinUser ? signinUser.Followings.some(following => following.id === Number(id)) : false
       }
       delete user.Tweets
       delete user.Followers
@@ -134,11 +135,11 @@ const userController = {
   },
   getUserTweets: async (req, res, next) => {
     try {
-      const UserId = req.params.id
-      const user = await User.findByPk(UserId, { raw: true, attributes: ['id'] })
+      const userId = req.params.id
+      const user = await User.findByPk(userId, { raw: true, attributes: ['id'] })
       if (!user) throw new Error('使用者不存在')
       const data = await Tweet.findAll({
-        where: { UserId },
+        where: { userId },
         attributes: ['id', 'description', 'updatedAt'],
         order: [['updatedAt', 'DESC']],
         include: [
@@ -152,7 +153,7 @@ const userController = {
           ...el.toJSON(),
           replies: el.Replies.length,
           likes: el.Likes.length,
-          isLike: (signinUser.Likes) ? signinUser.Likes.some(like => like.TweetId === el.id) : false
+          isLike: signinUser ? signinUser.Likes.some(like => like.TweetId === el.id) : false
         }
         delete tweet.Replies
         delete tweet.Likes
@@ -165,11 +166,11 @@ const userController = {
   },
   getUserReplies: async (req, res, next) => {
     try {
-      const UserId = req.params.id
-      const user = await User.findByPk(UserId, { raw: true, attributes: ['id'] })
+      const userId = req.params.id
+      const user = await User.findByPk(userId, { raw: true, attributes: ['id'] })
       if (!user) throw new Error('使用者不存在')
       const data = await Reply.findAll({
-        where: { UserId },
+        where: { userId },
         order: [['updatedAt', 'DESC']],
         attributes: ['comment', 'updatedAt'],
         include: [
@@ -196,11 +197,11 @@ const userController = {
   },
   getUserLikes: async (req, res, next) => {
     try {
-      const UserId = req.params.id
-      const user = await User.findByPk(UserId, { raw: true, attributes: ['id'] })
+      const userId = req.params.id
+      const user = await User.findByPk(userId, { raw: true, attributes: ['id'] })
       if (!user) throw new Error('使用者不存在')
       const data = await Like.findAll({
-        where: { UserId },
+        where: { userId },
         order: [['createdAt', 'DESC']],
         attributes: ['id', 'TweetId', 'createdAt'],
         include: [
@@ -216,19 +217,19 @@ const userController = {
       })
       const signinUser = helpers.getUser(req)
       const userLikes = data.map(el => {
-        const Like = {
+        const userLike = {
           ...el.toJSON(),
           tweeterId: el.Tweet.User.id,
           account: el.Tweet.User.account,
           name: el.Tweet.User.name,
           avatar: el.Tweet.User.avatar,
           description: el.Tweet.description,
-          replies: el.Tweet.Replies?.length,
-          likes: el.Tweet.Likes?.length,
-          isLike: (signinUser.Likes) ? signinUser.Likes.some(like => like.TweetId === el.TweetId) : false
+          replies: el.Tweet.Replies.length,
+          likes: el.Tweet.Likes.length,
+          isLike: signinUser ? signinUser.Likes.some(like => like.TweetId === el.TweetId) : false
         }
-        delete Like.Tweet
-        return Like
+        delete userLike.Tweet
+        return userLike
       })
       res.status(200).json(userLikes)
     } catch (err) {
@@ -256,7 +257,7 @@ const userController = {
       const signinUser = helpers.getUser(req)
       const followers = data.map(el => ({
         ...el,
-        isFollowing: signinUser.Followings?.some(following => following.id === el.followerId)
+        isFollowing: signinUser && signinUser.Followings.some(following => following.id === el.followerId)
       }))
       res.status(200).json(followers)
     } catch (err) {
@@ -284,7 +285,7 @@ const userController = {
       const signinUser = helpers.getUser(req)
       const followings = data.map(el => ({
         ...el,
-        isFollowing: signinUser.Followings?.some(following => following.id === el.followingId)
+        isFollowing: signinUser && signinUser.Followings.some(following => following.id === el.followingId)
       }))
       res.status(200).json(followings)
     } catch (err) {
@@ -318,7 +319,7 @@ const userController = {
       })
       const users = data.map(el => ({
         ...el.toJSON(),
-        isFollowing: signinUser.Followings?.some(following => following.id === el.id)
+        isFollowing: signinUser && signinUser.Followings.some(following => following.id === el.id)
       }))
       res.status(200).json(users)
     } catch (err) {
